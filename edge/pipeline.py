@@ -8,16 +8,18 @@ class TrackRecognizePipeline:
         self.face_id = face_id
 
         self.frame_idx = 0
-        self.names_by_track = {} #track_id-name
-        self.ttl_by_track = {}  #track_id-frames remaining
+        self.names_by_track = {}
+        self.ttl_by_track = {}
+        self.max_cached_tracks = 50
+        self.track_order = []  # FIFO eviction
 
         self.prev_center = None
         self.alpha = 0.7  # smoothing
 
-    def _decay_cache(self):#time to live for tid's
+    def _decay_cache(self):
         dead = []
 
-        for tid in list(self.ttl_by_track.keys()): 
+        for tid in list(self.ttl_by_track.keys()):
             self.ttl_by_track[tid] -= 1
             if self.ttl_by_track[tid] <= 0:
                 dead.append(tid)
@@ -25,6 +27,18 @@ class TrackRecognizePipeline:
         for tid in dead:
             self.ttl_by_track.pop(tid, None)
             self.names_by_track.pop(tid, None)
+            if tid in self.track_order:
+                self.track_order.remove(tid)
+
+
+        # max cache size
+        if len(self.names_by_track) > self.max_cached_tracks:
+            excess = len(self.names_by_track) - self.max_cached_tracks
+            for _ in range(excess):
+                if self.track_order:
+                    oldest_tid = self.track_order.pop(0)
+                    self.names_by_track.pop(oldest_tid, None)
+                    self.ttl_by_track.pop(oldest_tid, None)
 
     @staticmethod
     def _safe_crop(frame, box):
@@ -41,9 +55,8 @@ class TrackRecognizePipeline:
     def run(self):
         while True:
 
-            #capture frames ------------------------------
-
-            frame = self.camera.read()
+            #capture frames with frame skipping---------
+            frame = self.camera.read_skip()
 
             if frame is None:
                 continue
@@ -85,31 +98,66 @@ class TrackRecognizePipeline:
                 self.prev_center = smoothed
 
         
-            # recognition-------------------------------
+            # recognition with smart selection & batch processing
             do_face = (self.frame_idx % config.FACE_SCAN_EVERY_N_FRAMES == 0)
-            
-            
+
             if do_face:
-                for d in dets:
+                person_dets = [d for d in dets if d.get("label") == "person" and d.get("conf", 0) >= config.FACE_MIN_PERSON_CONF]
+
+                # sort by size take top n 
+                person_dets.sort(key=lambda d: (d["box"][2] - d["box"][0]) * (d["box"][3] - d["box"][1]), reverse=True)
+                person_dets = person_dets[:config.FACE_PROCESS_TOP_N]
+
+                # crops for batch
+                crops_to_process = []
+                indices_to_process = []
+
+                for i, d in enumerate(person_dets):
                     tid = d["track_id"]
 
                     if tid < 0:
                         continue
 
-                    # cached skip
-                    if tid in self.names_by_track and self.ttl_by_track.get(tid, 0) > 0:
+                    # skip cached
+                    ttl_remaining = self.ttl_by_track.get(tid, 0)
+                    max_ttl = config.TRACK_NAME_TTL_FRAMES
+                    if tid in self.names_by_track and ttl_remaining > max_ttl * 0.5:
                         continue
 
                     crop = self._safe_crop(frame, d["box"])
                     if crop is None:
                         continue
-                    
-                    #actual recognition
-                    result = self.face_id.identify_from_person_crop(crop)
-                    name = result["name"]
 
-                    self.names_by_track[tid] = name
-                    self.ttl_by_track[tid] = config.TRACK_NAME_TTL_FRAMES
+                    crops_to_process.append(crop)
+                    indices_to_process.append(i)
+
+                # process batch if any crops
+                if crops_to_process:
+                    results = self.face_id.identify_batch(crops_to_process)
+
+                    for result_idx, det_idx in enumerate(indices_to_process):
+                        d = person_dets[det_idx]
+                        tid = d["track_id"]
+                        result = results[result_idx]
+                        name = result["name"]
+                        score = result["score"]
+
+                        # track new ids
+                        if tid not in self.names_by_track:
+                            self.track_order.append(tid)
+
+                        self.names_by_track[tid] = name
+
+                        # adapt to confidence
+                        if name != "Unknown":
+                            if score >= config.FACE_SIM_THRESHOLD_HIGH:
+                                self.ttl_by_track[tid] = config.TRACK_NAME_TTL_FRAMES * 2  # 120 fps
+                            elif score >= config.FACE_SIM_THRESHOLD_LOW:
+                                self.ttl_by_track[tid] = config.TRACK_NAME_TTL_FRAMES // 2  # 30 fps
+                            else:
+                                self.ttl_by_track[tid] = config.TRACK_NAME_TTL_FRAMES  # 60 fps
+                        else:
+                            self.ttl_by_track[tid] = 0  # unknown
 
 
 
