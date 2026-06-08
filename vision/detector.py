@@ -55,6 +55,7 @@ class YOLOTracker:
                 "label": label
             })
 
+
         return dets
 
     @staticmethod

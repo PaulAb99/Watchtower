@@ -4,10 +4,10 @@ CAMERA_INDEX = 0
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
 CAMERA_FPS = 15
-CAMERA_FRAME_SKIP = 1  # Process every 2nd frame (skip 1 between processing)
+CAMERA_FRAME_SKIP = 1  
 
 # Tracking
-YOLO_MODEL = "yolov8s-seg.pt"
+YOLO_MODEL = "yolov8n.pt"
 ONLY_PERSON = False          
 PERSONS_CAT_DOG=True
 SHOW_YOLO_LABELS = True
@@ -16,7 +16,7 @@ TRACKER_CONFIG = "bytetrack.yaml"
 TRACK_PERSIST = True
 
 # Recognition
-KNOWN_FACES_DIR = "edge/known_faces"
+KNOWN_FACES_DIR = "known_faces"
 FACE_DET_SIZE = (640,640)
 FACE_SIM_THRESHOLD = 0.30
 FACE_SCAN_EVERY_N_FRAMES = 5
@@ -32,3 +32,6 @@ FACE_SIM_THRESHOLD_LOW = 0.35
 FACE_BATCH_SIZE = 5
 FACE_DET_SIZE_FAST = (320, 320) 
 FACE_QUALITY_MIN_SIZE = (80, 80)            
+
+#Other
+PETS=True

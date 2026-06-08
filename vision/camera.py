@@ -1,6 +1,9 @@
 import cv2
 import config
 import platform
+import threading
+import queue
+
 
 class Camera:
     def __init__(self, index=None, width=None, height=None, fps=None):
@@ -30,6 +33,17 @@ class Camera:
 
         self.frame_skip = config.CAMERA_FRAME_SKIP
 
+        # thread upgrade
+
+        self.frame_queue = queue.Queue(maxsize=1)
+        self.running = True
+
+        self.capture_thread = threading.Thread(
+            target=self._capture_loop,
+            daemon=True
+        )
+        self.capture_thread.start()
+
     def _detect_rpi(self):
         try:
             with open('/proc/cpuinfo', 'r') as f:
@@ -48,15 +62,35 @@ class Camera:
         return None
 
     def read(self):
-        ret, frame = self.cap.read()
-        return frame if ret else None
+        try:
+            return self.frame_queue.get(timeout=1)
+        except queue.Empty:
+            return None
 
     def read_skip(self):
-        for _ in range(self.frame_skip + 1):
-            ret, frame = self.cap.read()
-            if not ret:
-                return None
-        return frame
+        return self.read()
 
     def release(self):
+        self.running = False
+
+        if self.capture_thread.is_alive():
+            self.capture_thread.join(timeout=1)
+
         self.cap.release()
+
+        
+
+    def _capture_loop(self):
+        while self.running:
+            ret, frame = self.cap.read()
+
+            if not ret:
+                continue
+
+            if self.frame_queue.full():
+                try:
+                    self.frame_queue.get_nowait()
+                except queue.Empty:
+                    pass
+
+            self.frame_queue.put(frame)

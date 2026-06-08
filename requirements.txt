@@ -1,0 +1,4 @@
+insightface==0.7.3
+numpy==2.4.6
+opencv_python==4.13.0.92
+ultralytics==8.4.41

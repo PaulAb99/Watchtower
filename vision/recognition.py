@@ -10,8 +10,8 @@ def _l2_normalize(v: np.ndarray) -> np.ndarray:
 
 class FaceIdentifier:
     def __init__(self):
-        self.app = FaceAnalysis(name="buffalo_l")
-        self.app.prepare(ctx_id=-1, det_size=config.FACE_DET_SIZE)
+        self.app = FaceAnalysis(name="buffalo_sc")
+        self.app.prepare(ctx_id=-1, det_size=(320, 320))
 
         self.db_names = []
         self.db_embs = []
@@ -81,7 +81,7 @@ class FaceIdentifier:
 
 
     def identify_from_person_crop(self, person_crop_bgr: np.ndarray):
-        if self.db_embs.shape[0] == 0:
+        if not isinstance(self.db_embs, np.ndarray) or self.db_embs.shape[0] == 0:
             return {"name": "Unknown", "score": 0}
 
         faces = self.app.get(person_crop_bgr)
@@ -109,7 +109,7 @@ class FaceIdentifier:
 
 
     def identify_batch(self, person_crops_bgr: list):
-        if self.db_embs.shape[0] == 0:
+        if not isinstance(self.db_embs, np.ndarray) or self.db_embs.shape[0] == 0:
             return [{"name": "Unknown", "score": 0} for _ in person_crops_bgr]
 
         results = []
