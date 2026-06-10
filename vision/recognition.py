@@ -148,3 +148,5 @@ class FaceIdentifier:
             return {"name": self.db_names[best_idx], "score": best_sim}
 
         return {"name": "Unknown", "score": best_sim}
+    
+    

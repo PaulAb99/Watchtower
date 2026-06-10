@@ -5,12 +5,16 @@ import queue
 
 
 class TrackRecognizePipeline:
-    def __init__(self, camera, tracker, face_id, state, follow_controller):
+    def __init__(self, camera, tracker, face_id, state, follow_controller, servo_worker):
         self.camera = camera
         self.tracker = tracker
         self.face_id = face_id
         self.state = state
         self.follow_controller = follow_controller
+        self.servo_worker = servo_worker
+
+        self.latest_frame = None
+        self.latest_frame_lock = threading.Lock()
 
         self.frame_skip_counter = 0
         self.frame_idx = 0
@@ -35,6 +39,16 @@ class TrackRecognizePipeline:
             daemon=True
         )
         self.recognition_thread.start()
+
+    def set_latest_frame(self, frame):
+        with self.latest_frame_lock:
+            self.latest_frame = frame.copy()
+
+    def get_latest_frame(self):
+        with self.latest_frame_lock:
+            if self.latest_frame is None:
+                return None
+            return self.latest_frame.copy()
 
     def _decay_cache(self):
         dead = []
@@ -70,6 +84,15 @@ class TrackRecognizePipeline:
         if x2 <= x1 or y2 <= y1:
             return None
         return frame[y1:y2, x1:x2]
+
+    @staticmethod
+    def _upper_body_box(box):
+        x1, y1, x2, y2 = box
+        h = y2 - y1
+
+        new_y2 = int(y1 + h * 0.45)
+
+        return (x1, y1, x2, new_y2)
 
     def _recognition_worker(self):
 
@@ -116,6 +139,20 @@ class TrackRecognizePipeline:
 
             self.frame_idx += 1
 
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == 27:  # ESC
+                break
+
+            self._handle_key(key)
+
+            # MANUAL MODE: skip all AI/tracking/recognition
+            if self.state.mode == "manual":
+                manual_frame = frame.copy()
+                self.set_latest_frame(manual_frame)
+                cv2.imshow(
+                    "Multiple Obj Detection - Main Obj Tracking", manual_frame)
+                continue
             # memory --------------------------------------
             self._decay_cache()
 
@@ -171,8 +208,12 @@ class TrackRecognizePipeline:
             if main_target:
                 x1, y1, x2, y2 = main_target["box"]
 
+                box_h = y2 - y1
+
                 cx = (x1 + x2) // 2
-                cy = (y1 + y2) // 2
+
+                upper_body_ratio = 0.30
+                cy = int(y1 + box_h * upper_body_ratio)
 
                 raw_center = (cx, cy)
 
@@ -180,16 +221,20 @@ class TrackRecognizePipeline:
                     smoothed = raw_center
                 else:
                     smoothed = (
-                        int(self.alpha * self.prev_center[0] + (1 - self.alpha) * raw_center[0]),
-                        int(self.alpha * self.prev_center[1] + (1 - self.alpha) * raw_center[1]),
+                        int(self.alpha *
+                            self.prev_center[0] + (1 - self.alpha) * raw_center[0]),
+                        int(self.alpha *
+                            self.prev_center[1] + (1 - self.alpha) * raw_center[1]),
                     )
 
                     # Limit how far the target center can move per frame
                     dx = smoothed[0] - self.prev_center[0]
                     dy = smoothed[1] - self.prev_center[1]
 
-                    dx = max(-self.max_center_step_px, min(self.max_center_step_px, dx))
-                    dy = max(-self.max_center_step_px, min(self.max_center_step_px, dy))
+                    dx = max(-self.max_center_step_px,
+                             min(self.max_center_step_px, dx))
+                    dy = max(-self.max_center_step_px,
+                             min(self.max_center_step_px, dy))
 
                     smoothed = (
                         self.prev_center[0] + dx,
@@ -202,7 +247,7 @@ class TrackRecognizePipeline:
                 self.state.tracked_id = tracked
 
             else:
-                
+
                 self.prev_center = None
                 self.state.target_x = None
                 self.state.target_y = None
@@ -251,7 +296,8 @@ class TrackRecognizePipeline:
 
                         tid = d["track_id"]
 
-                        crop = self._safe_crop(frame, d["box"])
+                        upper_box = self._upper_body_box(d["box"])
+                        crop = self._safe_crop(frame, upper_box)
 
                         if crop is None:
                             continue
@@ -264,6 +310,7 @@ class TrackRecognizePipeline:
 
             annotated = self.tracker.draw(
                 frame, dets, tracked, self.names_by_track)
+            self.set_latest_frame(annotated)
             cv2.imshow("Multiple Obj Detection - Main Obj Tracking", annotated)
 
             counts = {}
@@ -274,9 +321,6 @@ class TrackRecognizePipeline:
             if self.frame_idx % 5 == 0:
                 print(counts)
 
-            if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
-                break
-
         self.running = False
 
         if self.recognition_thread.is_alive():
@@ -284,3 +328,49 @@ class TrackRecognizePipeline:
 
         self.camera.release()
         cv2.destroyAllWindows()
+
+    def _handle_key(self, key):
+        if key == 255:
+            return
+
+        step = 4.0
+
+        if key == ord("m"):
+            self.state.mode = "manual"
+            self.state.target_x = None
+            self.state.target_y = None
+            self.state.tracked_id = None
+
+            self.follow_controller.tracking = False
+            self.follow_controller.detection_counter = 0
+            self.follow_controller.lost_counter = 0
+
+            print("[MODE] manual")
+            return
+
+        elif key == ord("f"):
+            self.state.mode = "follow"
+            print("[MODE] follow")
+
+        elif key == ord("c"):
+            self.servo_worker.send("center")
+            print("[SERVO] center")
+
+        if self.state.mode != "manual":
+            return
+
+        if key == ord("a"):
+            self.servo_worker.send("left", value=step)
+            print("[MANUAL] left")
+
+        elif key == ord("d"):
+            self.servo_worker.send("right", value=step)
+            print("[MANUAL] right")
+
+        elif key == ord("w"):
+            self.servo_worker.send("up", value=step)
+            print("[MANUAL] up")
+
+        elif key == ord("s"):
+            self.servo_worker.send("down", value=step)
+            print("[MANUAL] down")

@@ -14,3 +14,8 @@ class SystemState:
         self.frame_height = 480
 
         self.tracked_id = None
+
+
+        self.person_detections = 0
+        self.unknown_detections = 0
+        self.last_event = None

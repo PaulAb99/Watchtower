@@ -75,8 +75,9 @@ h2 {
 .card {
   background: #020617;
   border: 1px solid #1f2937;
-  border-radius: 14px;
+  border-radius: 18px;
   padding: 20px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
 }
 
 .videoBox {
@@ -277,5 +278,260 @@ input {
 
   .dpad {
     width: 100%;
+  }
+}
+
+
+/* ---------- Auth pages ---------- */
+
+.authPage {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(37, 99, 235, 0.18), transparent 34%),
+    #0f172a;
+}
+
+.authCard {
+  width: min(460px, 100%);
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 22px;
+  padding: 30px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+.authHeader {
+  margin-bottom: 24px;
+}
+
+.authHeader h1 {
+  margin-bottom: 8px;
+  font-size: 2rem;
+}
+
+.authHeader p {
+  margin: 0;
+  color: #94a3b8;
+}
+
+.authForm {
+  display: grid;
+  gap: 16px;
+}
+
+.authForm label {
+  max-width: none;
+}
+
+.authForm input {
+  width: 100%;
+}
+
+.textButton {
+  margin-top: 18px;
+  background: transparent;
+  color: #93c5fd;
+  padding: 0;
+  font-weight: 800;
+}
+
+.textButton:hover {
+  background: transparent;
+  color: #bfdbfe;
+}
+
+.smallText {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-top: 18px;
+}
+
+
+/* ---------- Topbar / page actions ---------- */
+
+.topbarActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.secondaryButton {
+  background: #334155;
+}
+
+.secondaryButton:hover {
+  background: #475569;
+}
+
+.dashboardActions {
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+
+/* ---------- Dashboard system cards ---------- */
+
+.systemMeta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 16px 0;
+}
+
+.systemMeta span:not(.badge) {
+  color: #cbd5e1;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+
+/* ---------- Form selects ---------- */
+
+select {
+  width: 100%;
+  max-width: 320px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #020617;
+  color: white;
+  font-weight: 700;
+  outline: none;
+}
+
+select:focus,
+input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+}
+
+
+/* ---------- Event tracker ---------- */
+
+.eventGrid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.eventList {
+  display: grid;
+  gap: 12px;
+}
+
+.eventCard {
+  background: #020617;
+}
+
+.eventCard h3 {
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.eventCard p {
+  margin: 8px 0;
+}
+
+.eventHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.eventHeader .badge {
+  flex-shrink: 0;
+}
+
+.eventThumb,
+.eventThumbSmall {
+  border: 1px solid #1e293b;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #020617;
+}
+
+.eventThumb {
+  margin: 14px 0;
+}
+
+.eventThumb img,
+.eventThumbSmall img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.eventThumb img {
+  max-height: 420px;
+}
+
+.eventThumbSmall {
+  margin-top: 12px;
+  max-height: 170px;
+}
+
+.eventThumbSmall img {
+  height: 170px;
+}
+
+
+/* ---------- Compact side-column event cards ---------- */
+
+.sideColumn .eventCard {
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.sideColumn .eventCard h3 {
+  font-size: 1rem;
+}
+
+.sideColumn .eventCard p {
+  font-size: 0.9rem;
+}
+
+
+/* ---------- Better mobile behavior ---------- */
+
+@media (max-width: 700px) {
+  .authCard {
+    padding: 22px;
+  }
+
+  .topbarActions {
+    justify-content: flex-start;
+  }
+
+  .dashboardActions {
+    justify-content: stretch;
+  }
+
+  .dashboardActions button {
+    width: 100%;
+  }
+
+  .eventGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .eventHeader {
+    flex-direction: column;
+  }
+
+  select {
+    max-width: none;
   }
 }

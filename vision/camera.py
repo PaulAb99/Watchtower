@@ -24,6 +24,7 @@ class Camera:
         height = height or config.CAMERA_HEIGHT
         fps = fps or config.CAMERA_FPS
 
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self.cap.set(cv2.CAP_PROP_FPS, fps)

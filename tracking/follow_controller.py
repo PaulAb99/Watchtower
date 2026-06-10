@@ -1,27 +1,27 @@
 import time
 import threading
 
+from tracking import servo
+
 
 class FollowController:
 
-    def __init__(self, state, servo):
+    def __init__(self, state, servo_worker):
         self.state = state
-        self.servo = servo
+        self.servo_worker = servo_worker
 
         # Larger deadzone because camera + detection are noisy
-        self.deadzone_x = 90
-        self.deadzone_y = 90
+        self.deadzone_x = 80
+        self.deadzone_y = 80
 
         # P gains
-        self.pan_gain = 0.0015
-        self.tilt_gain = 0.001
+        self.pan_gain = 0.20
+        self.tilt_gain = 0.15
 
         # D gains: damp sudden changes
         self.pan_d_gain = 0.0
         self.tilt_d_gain = 0.0
 
-        # Limit correction
-        self.max_correction = 0.30
 
         # Detection stability
         self.target_confirmation_frames = 3
@@ -46,7 +46,7 @@ class FollowController:
 
         while self.running:
             self.update()
-            time.sleep(0.12)
+            time.sleep(0.01)
 
     def update(self):
         if self.state.mode != "follow":
@@ -64,7 +64,7 @@ class FollowController:
             if not self.tracking:
                 if self.detection_counter >= self.target_confirmation_frames:
                     self.tracking = True
-                    self.servo.unfreeze()
+                    self.servo_worker.send("unfreeze")
                     print("[TRACKING START] Target confirmed")
 
         else:
@@ -77,7 +77,7 @@ class FollowController:
                     print("[TRACKING STOP] Target lost")
 
                 self.tracking = False
-                self.servo.freeze()
+                self.servo_worker.send("freeze")
 
             return
 
@@ -104,37 +104,21 @@ class FollowController:
         # Error derivative
         d_error_x = error_x - self.prev_error_x
         d_error_y = error_y - self.prev_error_y
+        
+        servo = self.servo_worker.servo
+        target_pan = servo.pan
+        target_tilt = servo.tilt
 
-        # PAN
         if error_x != 0:
-            pan_correction = (
-                error_x * self.pan_gain +
-                d_error_x * self.pan_d_gain
-            )
+            pan_correction = 1 if error_x > 0 else -1
+    
+            target_pan = servo.pan + pan_correction * self.pan_gain
 
-            pan_correction = max(
-                -self.max_correction,
-                min(self.max_correction, pan_correction)
-            )
-
-            target_pan = self.servo.pan + pan_correction
-            self.servo.set_pan(target_pan)
-
-        # TILT
         if error_y != 0:
-            tilt_correction = (
-                error_y * self.tilt_gain +
-                d_error_y * self.tilt_d_gain
-            )
+            tilt_correction = 1 if error_y > 0 else -1
 
-            tilt_correction = max(
-                -self.max_correction,
-                min(self.max_correction, tilt_correction)
-            )
-
-            target_tilt = self.servo.tilt - tilt_correction
-            self.servo.set_tilt(target_tilt)
-
+            target_tilt = servo.tilt - tilt_correction * self.tilt_gain
+        self.servo_worker.send("move_to", (target_pan, target_tilt))
         self.prev_error_x = error_x
         self.prev_error_y = error_y
 

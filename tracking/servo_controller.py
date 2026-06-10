@@ -9,23 +9,26 @@ class ServoController:
         self.tilt_servo = Servo(tilt_pin)
 
         self.pan_center = 90.0
-        self.tilt_center = 20.0
+        self.tilt_center = 30.0
 
         self.pan = self.pan_center
         self.tilt = self.tilt_center
 
-        self.pan_min = 20
-        self.pan_max = 160
+        self.pan_min = 15
+        self.pan_max = 165
 
-        self.tilt_min = 20
-        self.tilt_max = 60
+        self.tilt_min = 15
+        self.tilt_max = 65
 
         self.min_interval = 0.15
-        self.max_step = 0.35
-        self.min_angle_change = 0.15
+        self.max_step = 0.20
+        self.min_angle_change = 0.05
 
         self.last_update_pan = 0
         self.last_update_tilt = 0
+        
+        self.pan_inverted = True
+        self.tilt_inverted = False
 
         self.frozen = False
 
@@ -53,7 +56,8 @@ class ServoController:
         if not force and now - self.last_update_pan < self.min_interval:
             return
 
-        target_angle = max(self.pan_min, min(self.pan_max, float(target_angle)))
+        target_angle = max(self.pan_min, min(
+            self.pan_max, float(target_angle)))
 
         if force:
             self.pan = target_angle
@@ -76,7 +80,8 @@ class ServoController:
         if not force and now - self.last_update_tilt < self.min_interval:
             return
 
-        target_angle = max(self.tilt_min, min(self.tilt_max, float(target_angle)))
+        target_angle = max(self.tilt_min, min(
+            self.tilt_max, float(target_angle)))
 
         if force:
             self.tilt = target_angle
@@ -91,6 +96,36 @@ class ServoController:
             self.last_update_tilt = now
             self.tilt_servo.set_angle(self.tilt)
 
+
+
+    ####manual control methods ####
+
+    def move_pan(self, delta, force=True):
+        self.set_pan(self.pan + delta, force=force)
+
+
+    def move_tilt(self, delta, force=True):
+        self.set_tilt(self.tilt + delta, force=force)
+
+
+    def move_left(self, step=2.0):
+        delta = step if self.pan_inverted else -step
+        self.move_pan(delta)
+
+    def move_right(self, step=2.0):
+        delta = -step if self.pan_inverted else step
+        self.move_pan(delta)
+
+    def move_up(self, step=2.0):
+        delta = step if self.tilt_inverted else -step
+        self.move_tilt(delta)
+
+    def move_down(self, step=2.0):
+        delta = -step if self.tilt_inverted else step
+        self.move_tilt(delta)
+
+
+    #common
     def freeze(self):
         self.frozen = True
 
