@@ -179,7 +179,7 @@ function AuthPage({ onAuth }) {
         </button>
 
         <p className="muted smallText">
-          Passwords are securely hashed and never stored in plain text.
+          An account is mandatory to access the dashboard.
         </p>
       </section>
     </main>

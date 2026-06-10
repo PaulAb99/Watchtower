@@ -1,6 +1,8 @@
 
 # images
 known_faces
+cloud_api.db
+cloud-api/uploads/events
 
 # yolo models
 yolov8n.pt
