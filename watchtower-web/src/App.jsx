@@ -338,6 +338,39 @@ function SystemPage({ user, system, onBack, onLogout }) {
             </div>
           </div>
 
+          <div className="card status">
+            <h2>Status</h2>
+
+            <div className="statsGrid">
+              <p>Mode: {status?.mode ?? "-"}</p>
+              <p>Pan: {status?.pan ?? "-"}</p>
+              <p>Tilt: {status?.tilt ?? "-"}</p>
+              <p>Tracked ID: {status?.tracked_id ?? "-"}</p>
+              <p>
+                Target:{" "}
+                {status?.target_x != null && status?.target_y != null
+                  ? `${status.target_x}, ${status.target_y}`
+                  : "-"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <aside className="sideColumn">
+          <div className="card">
+            <h2>Mode</h2>
+
+            <div className="buttonStack">
+              <button onClick={() => run(() => api.setManual())}>
+                Manual Mode
+              </button>
+
+              <button onClick={() => run(() => api.setFollow())}>
+                Follow Mode
+              </button>
+            </div>
+          </div>
+
           <div className="card">
             <h2>Manual Controls</h2>
 
@@ -371,51 +404,21 @@ function SystemPage({ user, system, onBack, onLogout }) {
               </button>
             </div>
           </div>
-        </div>
-
-        <aside className="sideColumn">
-          <div className="card">
-            <h2>Status</h2>
-            <p>Mode: {status?.mode ?? "-"}</p>
-            <p>Pan: {status?.pan ?? "-"}</p>
-            <p>Tilt: {status?.tilt ?? "-"}</p>
-            <p>Tracked ID: {status?.tracked_id ?? "-"}</p>
-            <p>
-              Target:{" "}
-              {status?.target_x != null && status?.target_y != null
-                ? `${status.target_x}, ${status.target_y}`
-                : "-"}
-            </p>
-          </div>
-
-          <div className="card">
-            <h2>Mode</h2>
-
-            <div className="buttonStack">
-              <button onClick={() => run(() => api.setManual())}>
-                Manual Mode
-              </button>
-
-              <button onClick={() => run(() => api.setFollow())}>
-                Follow Mode
-              </button>
-            </div>
-          </div>
-
-          <div className="card">
-            <h2>Recent Events</h2>
-
-            {events.length === 0 ? (
-              <p className="muted">No events yet.</p>
-            ) : (
-              <div className="eventList">
-                {events.slice(0, 5).map((event) => (
-                  <EventCard key={event.id} event={event} compact />
-                ))}
-              </div>
-            )}
-          </div>
         </aside>
+      </section>
+
+      <section className="card systemEventsCard">
+        <h2>Recent Events</h2>
+
+        {events.length === 0 ? (
+          <p className="muted">No events yet.</p>
+        ) : (
+          <div className="systemEventGrid">
+            {events.slice(0, 8).map((event) => (
+              <EventCard key={event.id} event={event} compact />
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
@@ -540,9 +543,14 @@ function EventCard({ event, compact = false }) {
       <p>Track ID: {event.track_id ?? "-"}</p>
 
       {event.has_image && (
-        <div className={compact ? "eventThumbSmall" : "eventThumb"}>
+        <a
+          className={compact ? "eventThumbSmall" : "eventThumb"}
+          href={cloudApi.eventImageUrl(event.id)}
+          target="_blank"
+          rel="noreferrer"
+        >
           <img src={cloudApi.eventImageUrl(event.id)} alt="Event snapshot" />
-        </div>
+        </a>
       )}
 
       {!compact && !reviewed && (

@@ -55,9 +55,9 @@ h2 {
   margin-top: 0;
 }
 
-.dashboardLayout {
+.layout {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 24px;
   align-items: start;
 }
@@ -534,4 +534,42 @@ input:focus {
   select {
     max-width: none;
   }
+}
+
+
+.systemEventsCard {
+  margin-top: 24px;
+}
+
+.systemEventGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.systemEventGrid .eventCard {
+  padding: 14px;
+}
+
+.systemEventGrid .eventCard h3 {
+  font-size: 1rem;
+}
+
+.systemEventGrid .eventCard p {
+  font-size: 0.9rem;
+}
+
+.systemEventGrid .eventThumbSmall {
+  max-height: 180px;
+}
+
+.systemEventGrid .eventThumbSmall img {
+  height: 180px;
+  cursor: zoom-in;
+}
+
+.eventThumb,
+.eventThumbSmall {
+  display: block;
+  cursor: zoom-in;
 }

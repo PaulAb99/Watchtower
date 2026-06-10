@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
+
 from fastapi import Cookie, Depends, FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -712,3 +713,107 @@ def mark_event_reviewed(event_id: int, user=Depends(get_current_user)):
     conn.close()
 
     return {"ok": True}
+
+
+@app.post("/api/dev/events/with-image")
+def dev_create_event_with_image(
+    system_id: int = Form(...),
+    event_type: str = Form(...),
+    label: Optional[str] = Form(None),
+    confidence: Optional[float] = Form(None),
+    track_id: Optional[int] = Form(None),
+    metadata_json: Optional[str] = Form("{}"),
+    image: UploadFile = File(...),
+):
+    """
+    Temporary local development endpoint.
+
+    This lets the Pi upload events without login/device security.
+    Later replace with /api/device/events/with-image.
+    """
+
+    if image.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Only JPEG and PNG images are allowed",
+        )
+
+    created_at = now_iso()
+
+    conn = get_connection()
+
+    system = conn.execute(
+        """
+        SELECT *
+        FROM systems
+        WHERE id = ?
+        """,
+        (system_id,),
+    ).fetchone()
+
+    if system is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="System not found")
+
+    cursor = conn.execute(
+        """
+        INSERT INTO events (
+            system_id,
+            event_type,
+            label,
+            confidence,
+            track_id,
+            image_path,
+            metadata_json,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            system_id,
+            event_type,
+            label,
+            confidence,
+            track_id,
+            None,
+            metadata_json or "{}",
+            created_at,
+        ),
+    )
+
+    event_id = cursor.lastrowid
+
+    extension = ".jpg" if image.content_type == "image/jpeg" else ".png"
+    filename = f"event_{event_id}{extension}"
+    relative_path = f"uploads/events/{filename}"
+    absolute_path = BASE_DIR / relative_path
+
+    with absolute_path.open("wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+
+    conn.execute(
+        """
+        UPDATE events
+        SET image_path = ?
+        WHERE id = ?
+        """,
+        (relative_path, event_id),
+    )
+
+    conn.commit()
+
+    row = conn.execute(
+        """
+        SELECT *
+        FROM events
+        WHERE id = ?
+        """,
+        (event_id,),
+    ).fetchone()
+
+    conn.close()
+
+    return {
+        "ok": True,
+        "event": row_to_dict(row),
+    }
