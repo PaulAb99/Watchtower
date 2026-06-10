@@ -7,8 +7,9 @@ from vision.pipeline import TrackRecognizePipeline
 
 from shared.state import SystemState
 from tracking.follow_controller import FollowController
-from tracking.servo_controller import ServoController
-from tracking.servo_command_worker import ServoCommandWorker
+
+
+from tracking.simple_pan_tilt import SimplePanTilt
 
 def main():
     print("###############################")
@@ -24,11 +25,11 @@ def main():
     state = SystemState()
     state.mode = "follow"
     
-    servo = ServoController(pan_pin=23, tilt_pin=18)
-    servo_worker = ServoCommandWorker(servo)
 
-    follow_controller = FollowController(state, servo_worker)
-    pipeline = TrackRecognizePipeline(camera, tracker, face_id, state, follow_controller, servo_worker)
+    servo = SimplePanTilt(pan_pin=23, tilt_pin=18)
+
+    follow_controller = FollowController(state, servo)
+    pipeline = TrackRecognizePipeline(camera, tracker, face_id, state, follow_controller, servo)
 
 
     pipeline.run()

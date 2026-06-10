@@ -8,13 +8,13 @@ from vision.unknown_event_tracker import UnknownEventTracker
 
 
 class TrackRecognizePipeline:
-    def __init__(self, camera, tracker, face_id, state, follow_controller, servo_worker):
+    def __init__(self, camera, tracker, face_id, state, follow_controller, servo):
         self.camera = camera
         self.tracker = tracker
         self.face_id = face_id
         self.state = state
         self.follow_controller = follow_controller
-        self.servo_worker = servo_worker
+        self.servo = servo
 
         self.cloud_client = CloudEventClient()
         self.unknown_event_tracker = UnknownEventTracker(self.cloud_client)
@@ -410,44 +410,33 @@ class TrackRecognizePipeline:
         if key == 255:
             return
 
-        step = 4.0
+        step = 2.0
 
         if key == ord("m"):
             self.state.mode = "manual"
-            self.state.target_x = None
-            self.state.target_y = None
-            self.state.tracked_id = None
-
-            self.follow_controller.tracking = False
-            self.follow_controller.detection_counter = 0
-            self.follow_controller.lost_counter = 0
-
             print("[MODE] manual")
             return
 
-        elif key == ord("f"):
+        if key == ord("f"):
             self.state.mode = "follow"
             print("[MODE] follow")
+            return
 
-        elif key == ord("c"):
-            self.servo_worker.send("center")
-            print("[SERVO] center")
+        if key == ord("c"):
+            self.servo.center()
+            return
 
         if self.state.mode != "manual":
             return
 
         if key == ord("a"):
-            self.servo_worker.send("left", value=step)
-            print("[MANUAL] left")
+            self.servo.left(step)
 
         elif key == ord("d"):
-            self.servo_worker.send("right", value=step)
-            print("[MANUAL] right")
+            self.servo.right(step)
 
         elif key == ord("w"):
-            self.servo_worker.send("up", value=step)
-            print("[MANUAL] up")
+            self.servo.up(step)
 
         elif key == ord("s"):
-            self.servo_worker.send("down", value=step)
-            print("[MANUAL] down")
+            self.servo.down(step)
