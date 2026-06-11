@@ -46,7 +46,7 @@ class FollowController:
 
         while self.running:
             self.update()
-            time.sleep(0.01)
+            time.sleep(0.25)
 
     def update(self):
         if self.state.mode != "follow":

@@ -16,8 +16,7 @@ from vision.pipeline import TrackRecognizePipeline
 
 from shared.state import SystemState
 from tracking.follow_controller import FollowController
-from tracking.servo_controller import ServoController
-from tracking.servo_command_worker import ServoCommandWorker
+from tracking.simple_pan_tilt import SimplePanTilt
 
 
 # --------------------------------------------------
@@ -29,7 +28,6 @@ tracker = None
 face_id = None
 state = None
 servo = None
-servo_worker = None
 follow_controller = None
 pipeline = None
 pipeline_thread = None
@@ -44,15 +42,17 @@ runtime_lock = threading.Lock()
 
 app = FastAPI(title="RPi Camera System API")
 
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # simple for local dev / EC2 frontend testing
+    allow_origins=[
+        "http://13.61.182.105",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # --------------------------------------------------
 # Request models
@@ -77,7 +77,6 @@ def start_runtime_once():
     global face_id
     global state
     global servo
-    global servo_worker
     global follow_controller
     global pipeline
     global pipeline_thread
@@ -100,25 +99,27 @@ def start_runtime_once():
         state = SystemState()
         state.mode = "manual"
 
-        servo = ServoController(
+        # New simplified servo controller
+        servo = SimplePanTilt(
             pan_pin=23,
             tilt_pin=18,
         )
 
-        servo_worker = ServoCommandWorker(servo)
-
+        # FollowController now receives the SimplePanTilt object directly
         follow_controller = FollowController(
             state,
-            servo_worker,
+            servo,
         )
 
+        # IMPORTANT:
+        # Your pipeline must now accept servo directly instead of servo_worker.
         pipeline = TrackRecognizePipeline(
             camera,
             tracker,
             face_id,
             state,
             follow_controller,
-            servo_worker,
+            servo,
         )
 
         pipeline_thread = threading.Thread(
@@ -169,13 +170,13 @@ def reset_follow_controller():
 def get_servo_pan():
     if servo is None:
         return None
-    return getattr(servo, "pan", None)
+    return servo.pan.angle
 
 
 def get_servo_tilt():
     if servo is None:
         return None
-    return getattr(servo, "tilt", None)
+    return servo.tilt.angle
 
 
 # --------------------------------------------------
@@ -220,12 +221,6 @@ def set_manual_mode():
     clear_target_state()
     reset_follow_controller()
 
-    # Optional but recommended:
-    # prevent a leftover AI movement command from executing after manual mode starts.
-    servo_worker.send("freeze")
-    time.sleep(0.05)
-    servo_worker.send("unfreeze")
-
     return {
         "ok": True,
         "mode": state.mode,
@@ -238,26 +233,17 @@ def set_follow_mode():
 
     state.mode = "follow"
 
-    servo_worker.send("unfreeze")
-
     return {
         "ok": True,
         "mode": state.mode,
     }
 
 
-# --------------------------------------------------
-# AI endpoints
-# For your current code, AI is effectively controlled by state.mode.
-# These aliases make the future frontend simpler.
-# --------------------------------------------------
-
 @app.post("/ai/start")
 def start_ai():
     require_runtime()
 
     state.mode = "follow"
-    servo_worker.send("unfreeze")
 
     return {
         "ok": True,
@@ -273,10 +259,6 @@ def stop_ai():
     state.mode = "manual"
     clear_target_state()
     reset_follow_controller()
-
-    servo_worker.send("freeze")
-    time.sleep(0.05)
-    servo_worker.send("unfreeze")
 
     return {
         "ok": True,
@@ -297,12 +279,14 @@ def servo_left(req: StepRequest):
     clear_target_state()
     reset_follow_controller()
 
-    servo_worker.send("left", req.step)
+    servo.left(req.step)
 
     return {
         "ok": True,
         "command": "left",
         "step": req.step,
+        "pan": get_servo_pan(),
+        "tilt": get_servo_tilt(),
     }
 
 
@@ -314,12 +298,14 @@ def servo_right(req: StepRequest):
     clear_target_state()
     reset_follow_controller()
 
-    servo_worker.send("right", req.step)
+    servo.right(req.step)
 
     return {
         "ok": True,
         "command": "right",
         "step": req.step,
+        "pan": get_servo_pan(),
+        "tilt": get_servo_tilt(),
     }
 
 
@@ -331,12 +317,14 @@ def servo_up(req: StepRequest):
     clear_target_state()
     reset_follow_controller()
 
-    servo_worker.send("up", req.step)
+    servo.up(req.step)
 
     return {
         "ok": True,
         "command": "up",
         "step": req.step,
+        "pan": get_servo_pan(),
+        "tilt": get_servo_tilt(),
     }
 
 
@@ -348,12 +336,14 @@ def servo_down(req: StepRequest):
     clear_target_state()
     reset_follow_controller()
 
-    servo_worker.send("down", req.step)
+    servo.down(req.step)
 
     return {
         "ok": True,
         "command": "down",
         "step": req.step,
+        "pan": get_servo_pan(),
+        "tilt": get_servo_tilt(),
     }
 
 
@@ -365,11 +355,13 @@ def servo_center():
     clear_target_state()
     reset_follow_controller()
 
-    servo_worker.send("center")
+    servo.center()
 
     return {
         "ok": True,
         "command": "center",
+        "pan": get_servo_pan(),
+        "tilt": get_servo_tilt(),
     }
 
 
@@ -377,28 +369,34 @@ def servo_center():
 def servo_move_to(req: MoveToRequest):
     require_runtime()
 
-    servo_worker.send(
-        "move_to",
-        (req.pan, req.tilt),
-    )
+    state.mode = "manual"
+    clear_target_state()
+    reset_follow_controller()
+
+    servo.pan.goto(req.pan)
+    servo.tilt.goto(req.tilt)
 
     return {
         "ok": True,
         "command": "move_to",
-        "pan": req.pan,
-        "tilt": req.tilt,
+        "pan": get_servo_pan(),
+        "tilt": get_servo_tilt(),
     }
 
+
+# --------------------------------------------------
+# Compatibility no-op endpoints
+# --------------------------------------------------
 
 @app.post("/servo/freeze")
 def servo_freeze():
     require_runtime()
 
-    servo_worker.send("freeze")
-
+    # No freeze in simplified servo system.
     return {
         "ok": True,
         "command": "freeze",
+        "note": "No-op in SimplePanTilt mode",
     }
 
 
@@ -406,11 +404,11 @@ def servo_freeze():
 def servo_unfreeze():
     require_runtime()
 
-    servo_worker.send("unfreeze")
-
+    # No unfreeze in simplified servo system.
     return {
         "ok": True,
         "command": "unfreeze",
+        "note": "No-op in SimplePanTilt mode",
     }
 
 
@@ -453,4 +451,3 @@ def video_feed():
         generate_video_frames(),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )
-
